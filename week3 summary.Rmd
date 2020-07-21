@@ -1,0 +1,527 @@
+---
+title: "Clean code"
+author: "Yineng Chen"
+date: "7/21/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(quanteda)
+library(readtext)
+library(stringi)
+library(knitr)
+library(ngram)
+require(stringr)
+require(newsmap)
+require(ggplot2)
+```
+
+# Task 2 - Exploratory Data Analysis
+
+## Load Data
+
+```{r}
+fileName="./data/en_US/en_US.blogs.txt"
+con=file(fileName,open="r")
+lineBlogs=readLines(con，encoding = "UTF-8") 
+close(con)
+
+con = file("./data/en_US/en_US.twitter.txt")
+linetwitter = readLines(con,skipNul = TRUE，encoding = "UTF-8")
+close(con)
+
+
+con = file("./data/en_US/en_US.news.txt")
+linenews = readLines(con,skipNul = TRUE，encoding = "UTF-8")
+close(con)
+
+# all_read = readtext("./data/en_US/*.txt", 
+                # dvsep = "_",
+                 # docvarsfrom = "filenames", 
+                 #   docvarnames = c("language","resource"))
+```
+
+## Construct corpus separetly 
+
+```{r}
+# sentance as unit
+# blogs
+blogs_crop = corpus(lineBlogs)
+
+# twitter
+twitter_crop = corpus(linetwitter)
+
+# news
+news_crop = corpus(linenews)
+
+# all_crop = corpus(all_read)
+```
+
+
+## Take sample
+
+Construct a function to take random sample
+
+```{r}
+randomSampleCorp <- function(corp, p=0.01) {
+        n1 <- ndoc(corp) # get number of docs
+        n <- n1*p # get % random sample from total sentences
+        corp_samp <- corpus_sample(corp, n, replace = FALSE)
+        return(corp_samp)
+}
+
+```
+
+Apply the function
+```{r}
+set.seed(1110)
+
+blogs_samplecorp = randomSampleCorp(blogs_crop, p=0.01)
+twitter_samplecorp = randomSampleCorp(twitter_crop, p=0.01) 
+news_samplecorp = randomSampleCorp(news_crop, p=0.01)
+```
+
+
+```{r}
+# a function to name each sentance
+idsentances = function(crop,source){
+  docvars(crop, field = "id") <- c(1:ndoc(crop))
+  docvars(crop, field = "source") <- c(as.character(source))
+  # change document names
+  docid <- paste(crop$source,
+               crop$id,
+                sep = " ")
+  docnames(crop) <- docid
+  crop
+}
+```
+
+
+combind corporas
+```{r}
+blogs_samplecorp = idsentances(blogs_samplecorp,"blogs")
+twitter_samplecorp = idsentances(twitter_samplecorp,"twitter")
+news_samplecorp = idsentances(news_samplecorp,"news")
+
+sample_crop = c(blogs_samplecorp,twitter_samplecorp,news_samplecorp)
+
+sample_crop = corpus_reshape(sample_crop, to = 'sentences')
+blogs_samplecorp = corpus_reshape(blogs_samplecorp, to = 'sentences')
+twitter_samplecorp = corpus_reshape(twitter_samplecorp, to = 'sentences')
+news_samplecorp = corpus_reshape(news_samplecorp, to = 'sentences')
+```
+
+
+## summary of sample corpus
+
+```{r}
+# Summarize
+summ = data.frame(Document = c("Blogs","Twitter","News"),
+              Sentences = c(ndoc(blogs_samplecorp),
+              ndoc(twitter_samplecorp),
+              ndoc(news_samplecorp)),
+              Size = c(format(object.size(blogs_samplecorp), "GB", digits = 4), 
+             format(object.size(twitter_samplecorp), "GB", digits = 4),
+             format(object.size(news_samplecorp), "GB", digits = 4))
+)
+
+knitr::kable(summ, caption = "Summary description of the sample English corpus")
+```
+
+
+## Clean sentances
+
+Construct a function to clean sentances:
+
+It is modified based on the code on [this] <http://amunategui.github.io/speak-like-a-doctor/> webside.
+
+```{r}
+Clean_Sentences <- function(text_blob) {
+        # swap all sentence ends with code 'ootoo'
+        text_blob <- gsub(pattern=';|\\.|!|\\?', x=text_blob, replacement='ootoo')
+        
+        # remove all non-alpha text (numbers etc)
+        text_blob <- gsub(pattern="[^[:alpha:]]", x=text_blob, replacement = ' ')
+        # remove Non-English Words
+       text_blob <- iconv(text_blob,"latin1","ASCII",sub = "")
+       
+        # force all characters to lower case
+        text_blob <- tolower(text_blob)
+        
+        # remove any small words {size} or {min,max}
+        text_blob <- gsub(pattern="\\W*\\b\\w{1,2}\\b", x=text_blob, replacement=' ')
+        
+        # Restore instances of e.g. "can't" when not appropriately converted   
+        text_blob <- gsub("\u0092", "'", text_blob)
+        text_blob <- gsub("\u0093|\u0094", "", text_blob)
+        
+         # To avoid the conversion of e.g. "U.S."" to "us"
+        text_blob <- gsub(pattern="U.S.A.| U.S.A | U.S | U.S.| U S | U.S | u s | u.s | u.s.a |united states |United States", x=text_blob, replacement='USA')
+        
+        # remove contiguous spaces
+        text_blob <- gsub(pattern = "\\s+", x=text_blob, replacement=' ')
+        
+        # split sentences by split code
+        sentence_vector <- unlist(strsplit(x=text_blob, split='ootoo',fixed = TRUE))
+        return(sentence_vector)
+}
+
+```
+
+clean sentance in sample_corp
+
+```{r}
+sample_crop_clean_sentences = Clean_Sentences(paste(sample_crop, collapse = " "))
+sample_crop_clean = corpus(sample_crop_clean_sentences)
+```
+
+
+
+## Create a English dictionary
+
+```{r}
+dic_Url = "https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt"
+download.file(dic_Url, destfile = "./dictionary/words_alpha.txt")
+
+dictEn = read.csv(file = "./dictionary/words_alpha.txt", header = FALSE, sep = ",", stringsAsFactors = FALSE)
+
+mydict = dictionary(list(engwords = dictEn[,1]))
+
+
+```
+
+
+Is it a quanteda dictionary?
+```{r}
+
+is.dictionary(mydict)
+
+```
+
+# Tokens
+
+```{r}
+options(width = 110)
+# tokens , remove numbers, punctuations and symbols
+
+sample_tokens = tokens(sample_crop_clean, 
+                       remove_punct = TRUE,
+                       remove_numbers = TRUE,
+                       remove_symbols = TRUE)
+
+
+```
+
+Remove non-english words according to the dictionay
+
+```{r}
+sample_tokens = tokens_select(sample_tokens,
+                              pattern = mydict, 
+                              selection = "keep", 
+                              case_insensitive = TRUE)
+```
+
+## what are the distributions of word frequencies? 
+
+Most frequent words with more than 5 charecters. Creat a word cloud for these words that appears more than 230 times. 
+
+### 1 gram
+
+```{r}
+# creat document feature matrix
+sample_dfm_1g <- dfm(sample_tokens,remove = stopwords("english"), stem = TRUE)
+# ndoc(sample_dfm_1g)
+# nfeat(sample_dfm_1g)
+topfeatures(sample_dfm_1g, 15)
+
+# select : minimum character = 5
+# sample_dfm_long <- dfm_select(sample_dfm, min_nchar = 5)
+# top15_1g = topfeatures(sample_dfm_long, 15)  # top 10 
+# top15_1g
+
+# word cloud for 1 gram
+textplot_wordcloud(sample_dfm_1g , min_count = 230, random_order = FALSE,
+                   rotation = .25, 
+                   colors = RColorBrewer::brewer.pal(8,"Dark2"))
+
+sample_dfm_1g %>% 
+  textstat_frequency(n = 15) %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequency") +
+  theme_minimal()
+```
+
+ 
+## What are the frequencies of 2-grams and 3-grams in the dataset? 
+
+### Top 15 2-grams
+
+Most frequent 2-grams with more than 10 charecters. 
+
+```{r}
+tokens_2gram  <- tokens_ngrams(sample_tokens, n = 2)
+# head(tokens_2gram[[1]], 20)
+
+# creat document feature matrix
+sample_dfm_2g <- dfm(tokens_2gram,remove = stopwords("english"), stem = TRUE)
+# ndoc(sample_dfm_2g)
+# nfeat(sample_dfm_2g)
+# sample_dfm_2g[,1:4]
+
+
+top15_2g = topfeatures(sample_dfm_2g, 15)
+top15_2g
+
+sample_dfm_2g %>% 
+  textstat_frequency(n = 15) %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequency") +
+  theme_minimal()
+```
+
+### Top 10 3-grams
+
+Most frequent 3-grams with more than 15 charecters. 
+
+```{r}
+tokens_3gram  <- tokens_ngrams(sample_tokens, n = 3)
+# head(tokens_3gram[[1]], 20)
+
+
+# creat document feature matrix
+sample_dfm_3g <- dfm(tokens_3gram,remove = stopwords("english"), stem = TRUE)
+# ndoc(sample_dfm_3g)
+# nfeat(sample_dfm_3g)
+# sample_dfm_3g,1:4]
+
+
+top15_3g = topfeatures(sample_dfm_3g, 15)
+top15_3g
+
+sample_dfm_3g %>% 
+  textstat_frequency(n = 15) %>% 
+  ggplot(aes(x = reorder(feature, frequency), y = frequency)) +
+  geom_point() +
+  coord_flip() +
+  labs(x = NULL, y = "Frequency") +
+  theme_minimal()
+```
+
+
+## How many unique words do you need in a frequency sorted dictionary to cover 50%
+
+We need 109 unique words to cover 50% of all word instances in the language and 3461 unique words to cover 90%.
+
+```{r}
+dfm_token_all <- dfm(sample_tokens, stem = TRUE)
+
+# get frequency of each words
+fre = textstat_frequency(dfm_token_all)
+
+# total number of words
+totalfreq = sum(fre$frequency) # 522724
+
+sumCover = 0
+maxlimt = length(fre$frequency)  # number of unique words 17047
+
+for(i in 1: maxlimt) {
+  sumCover <- sumCover + fre$frequency[i]
+  if(sumCover >= 0.5*totalfreq){break}
+}
+print(i) # 172
+
+sumCover = 0
+maxlimt = length(fre$frequency)
+for(i in 1: maxlimt) {
+  sumCover <- sumCover + fre$frequency[i]
+  if(sumCover >= 0.9*totalfreq){break}
+}
+print(i) # 2868
+```
+
+
+# A Prediction Model
+
+## Training and testing data set
+
+The sample data were seperated into training data and testing data at a ratio of 8 : 2 for each document.
+
+```{r}
+# construct corpus seperatly
+## blog
+blog_crop = corpus_reshape(blogs_samplecorp, to = 'sentences')
+
+docvars(blog_crop, field = "num_sentance")= c(1:ndoc(blog_crop))
+
+n = ndoc(blog_crop)
+n_train = round(0.8*n)
+
+train_blog = corpus_subset(blog_crop, num_sentance %in% c(1:n_train))
+test_blogs = corpus_subset(blog_crop, num_sentance %in% c(n_train + 1:n))
+
+
+## news
+news_crop = corpus_reshape(news_samplecorp, to = 'sentences')
+
+docvars(news_crop, field = "num_sentance") = c(1:ndoc(news_crop))
+
+n = ndoc(news_crop)
+n_train = round(0.8*n)
+
+train_news = corpus_subset(news_crop, num_sentance %in% c(1:n_train))
+test_news = corpus_subset(news_crop, num_sentance %in% c(n_train + 1:n))
+
+## twitter
+twitter_crop = corpus_reshape(twitter_samplecorp, to = 'sentences')
+
+docvars(twitter_crop, field = "num_sentance") <- c(1:ndoc(twitter_crop))
+
+n = ndoc(twitter_crop)
+n_train = round(0.8*n)
+
+train_twitter = corpus_subset(twitter_crop, num_sentance %in% c(1:n_train))
+test_twitter = corpus_subset(twitter_crop, num_sentance %in% c(n_train + 1:n))
+
+
+## Combine three corous
+training = c(train_blog,train_news,train_twitter)
+length(training) # 50568
+
+testing = c(test_blogs,test_news,test_twitter)
+length(testing) # 12642
+
+rm("train_blog","train_news","train_twitter")
+rm("test_blogs","test_news","test_twitter")
+```
+
+Apply the Clean_Sentences() function
+
+```{r}
+ 
+train_clean_sentences <- Clean_Sentences(paste(training, collapse = " "))
+text_clean_sentences <- Clean_Sentences(paste(testing, collapse = " "))
+
+
+## remove " "
+train_clean_sentences <- train_clean_sentences[train_clean_sentences != ""]
+text_clean_sentences <- text_clean_sentences[text_clean_sentences != ""]
+```
+
+
+See some of the sentances
+```{r}
+train_clean_sentences[1:3]
+text_clean_sentences[1:3]
+```
+
+
+## get n gram
+
+### A function to get n garm
+
+```{r}
+# returns string w/o leading or trailing whitespace
+trim <- function(x) gsub("^\\s+|\\s+$", "", x)
+
+
+# a function to get n garm
+Get_Ngrams <- function(sentence_splits, ngram_size=2) {
+        ngrams <- c()
+        for (sentence in sentence_splits) {
+                sentence <- trim(sentence)
+                if ((nchar(sentence) > 0) && (sapply(gregexpr("\\W+", sentence), length) >= ngram_size)) {
+                        ngs <- ngram(sentence , n=ngram_size)
+                        ngrams <- c(ngrams, get.ngrams(ngs))
+                }
+        }
+        return(ngrams)
+}
+```
+
+
+
+```{r}
+n2 <- Get_Ngrams(train_clean_sentences, ngram_size = 2)
+n3 <- Get_Ngrams(train_clean_sentences, ngram_size = 3)
+n4 <- Get_Ngrams(train_clean_sentences, ngram_size = 4)
+n5 <- Get_Ngrams(train_clean_sentences, ngram_size = 5)
+
+n_all <- c(n2, n3, n4, n5)
+
+write.csv(n_all, 'ngrams.csv', row.names = FALSE)
+
+# n_all = read.csv("ngrams.csv")
+```
+
+
+## Anfunction to Predict
+
+```{r}
+next_word <- function(known_word){
+   
+  word = trim(known_word)
+  
+  if (nchar(word) == 0)
+    return('')
+  
+  # find grams that match key words
+  matches <- c()
+  for (sentence in n_all) {
+        # find exact match with double backslash and escape
+        if (grepl(paste0('\\<',word), sentence)) {
+                matches = c(matches, sentence)
+                }
+    }
+
+  
+  # didn't find a match so return nothing
+ if (is.null(matches))
+  return ('')
+  
+  
+  # extract the second part after key words in all matches
+  next_part_match <- c()
+  for (a_match in matches) {
+       next_part_match <- c(next_part_match,
+                             strsplit(x = a_match, split = word)[[1]][[2]])
+       next_part_match = trim(next_part_match)
+    }
+  
+  # split second part by spaces and pick first word
+  next_word_match = c()
+    for (a_part in next_part_match){
+    if (str_count(a_part, '\\w+') == 1){
+      next_word_match <- c(next_word_match,a_part)
+    } else {
+      next_word_match <- c(next_word_match,
+                             strsplit(x = a_part, split = " ")[[1]][[1]]) 
+      }
+    }
+  
+ # count the frequency of all next words  
+ word_count = aggregate(data.frame(count = next_word_match), 
+                        list(value = next_word_match), length)
+ 
+ # find the word appear most frequently
+ word_maxcount = word_count$value[word_count$count == max(word_count$count)]
+                          
+
+  
+  # return first word
+  return(word_maxcount)
+
+}
+
+# known_word = "infection in patients"
+# next_word("patients")
+```
+

@@ -10,6 +10,13 @@ Project Overview
 This is a capstone project for Data Science Specialization, a 10-course sequence developed by John Hopkins University, available in Coursera. The data used in this project was given by SwiftKey company. 
 
 
+```{r, echo=FALSE, out.width = '30%',out.height='30%'}
+knitr::include_graphics(c("./Swiftkey/pics/JHU-Logo.png"))
+
+knitr::include_graphics(c("./Swiftkey/pics/coursera.png"))
+
+```
+
 Natural Language Processing Model
 ========================================================
 **Packages Used in this project**
@@ -39,23 +46,13 @@ How the model works
 
 Shiny application
 ========================================================
-- The shiny application is available in
+- The shiny application is available in: https://yinengchen1024.shinyapps.io/DS_capstone_project_Swiftkey/
+- You can also download it from github repository:  https://github.com/YinengChen/dscapstone
 
-
-- You can also download it from github repository 
-
-
-```{r, echo=FALSE, out.width = '100%'}
-knitr::include_graphics("./Swiftkey/pics/app.png")
-```
-
-
-Instructions to run it 
-========================================================
-- Access to the application 
-
+**Instructions to run it**
 - Enter the sentence in the box, clikc "Predict next word..." button. The app will show the next word predicted.
 
-```{r, echo=FALSE, out.width = '100%'}
+```{r, echo=FALSE, out.width = '40%',out.height='40%'}
 knitr::include_graphics("./Swiftkey/pics/app.png")
 ```
+

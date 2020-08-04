@@ -10,6 +10,8 @@ Project Overview
 This is a capstone project for Data Science Specialization, a 10-course sequence developed by John Hopkins University, available in Coursera. The data used in this project was given by SwiftKey company. 
 
 
+<img src="./Swiftkey/pics/JHU-Logo.png" title="plot of chunk unnamed-chunk-1" alt="plot of chunk unnamed-chunk-1" width="30%" height="30%" /><img src="./Swiftkey/pics/coursera.png" title="plot of chunk unnamed-chunk-1" alt="plot of chunk unnamed-chunk-1" width="30%" height="30%" />
+
 Natural Language Processing Model
 ========================================================
 **Packages Used in this project**
@@ -39,19 +41,11 @@ How the model works
 
 Shiny application
 ========================================================
-- The shiny application is available in
+- The shiny application is available in: https://yinengchen1024.shinyapps.io/DS_capstone_project_Swiftkey/
+- You can also download it from github repository:  https://github.com/YinengChen/dscapstone
 
-
-- You can also download it from github repository 
-
-
-<img src="./Swiftkey/pics/app.png" title="plot of chunk unnamed-chunk-1" alt="plot of chunk unnamed-chunk-1" width="100%" />
-
-
-Instructions to run it 
-========================================================
-- Access to the application 
-
+**Instructions to run it**
 - Enter the sentence in the box, clikc "Predict next word..." button. The app will show the next word predicted.
 
-<img src="./Swiftkey/pics/app.png" title="plot of chunk unnamed-chunk-2" alt="plot of chunk unnamed-chunk-2" width="100%" />
+<img src="./Swiftkey/pics/app.png" title="plot of chunk unnamed-chunk-2" alt="plot of chunk unnamed-chunk-2" width="40%" height="40%" />
+

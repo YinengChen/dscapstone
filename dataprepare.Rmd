@@ -1,0 +1,197 @@
+---
+title: "Model"
+author: "Yineng Chen"
+date: "7/26/2020"
+output: html_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(quanteda)
+library(readtext)
+library(stringi)
+library(knitr)
+library(ngram)
+library(stringr)
+```
+
+
+```{r}
+# read in data
+
+fileName="./data/en_US/en_US.blogs.txt"
+con=file(fileName,open="r")
+lineBlogs=readLines(con，encoding = "UTF-8") 
+close(con)
+
+con = file("./data/en_US/en_US.twitter.txt")
+linetwitter = readLines(con,skipNul = TRUE，encoding = "UTF-8")
+close(con)
+
+
+con = file("./data/en_US/en_US.news.txt")
+linenews = readLines(con,skipNul = TRUE，encoding = "UTF-8")
+close(con)
+```
+
+
+## Sample
+
+
+```{r}
+# sample
+# sentance as unit
+# blogs
+blogs_crop = corpus(lineBlogs)
+
+# twitter
+twitter_crop = corpus(linetwitter)
+
+# news
+news_crop = corpus(linenews)
+
+randomSampleCorp <- function(corp, p=0.01) {
+        n1 <- ndoc(corp) # get number of docs
+        n <- n1*p # get % random sample from total sentences
+        corp_samp <- corpus_sample(corp, n, replace = FALSE)
+        return(corp_samp)
+}
+
+
+```
+
+```{r, cache=TRUE}
+# samples
+
+set.seed(1110)
+
+blogs_samplecorp = randomSampleCorp(blogs_crop, p=0.001)
+twitter_samplecorp = randomSampleCorp(twitter_crop, p=0.001) 
+news_samplecorp = randomSampleCorp(news_crop, p=0.001)
+```
+
+
+```{r}
+# a function to name each sentance
+idsentances = function(crop,source){
+  docvars(crop, field = "id") <- c(1:ndoc(crop))
+  docvars(crop, field = "source") <- c(as.character(source))
+  # change document names
+  docid <- paste(crop$source,
+               crop$id,
+                sep = " ")
+  docnames(crop) <- docid
+  return(crop)
+}
+```
+
+```{r}
+# add variable
+blogs_samplecorp = idsentances(blogs_samplecorp,"blogs")
+twitter_samplecorp = idsentances(twitter_samplecorp,"twitter")
+news_samplecorp = idsentances(news_samplecorp,"news")
+
+# combind corporas
+sample_crop = c(blogs_samplecorp,twitter_samplecorp,news_samplecorp)
+```
+
+
+```{r}
+# clean sentance
+Clean_Sentences <- function(text_blob) {
+        # swap all sentence ends with code 'ootoo'
+        text_blob <- gsub(pattern=';|\\.|!|\\?', x=text_blob, replacement='ootoo')
+        
+        # remove all non-alpha text (numbers etc)
+        text_blob <- gsub(pattern="[^[:alpha:]]", x=text_blob, replacement = ' ')
+        # remove Non-English Words
+       text_blob <- iconv(text_blob,"latin1","ASCII",sub = "")
+       
+        # force all characters to lower case
+        text_blob <- tolower(text_blob)
+        
+        # remove any small words {size} or {min,max}
+        # text_blob <- gsub(pattern="\\W*\\b\\w{1,2}\\b", x=text_blob, replacement=' ')
+        
+        # Restore instances of e.g. "can't" when not appropriately converted   
+        text_blob <- gsub("\u0092", "'", text_blob)
+        text_blob <- gsub("\u0093|\u0094", "", text_blob)
+        
+         # To avoid the conversion of e.g. "U.S."" to "us"
+        text_blob <- gsub(pattern="U.S.A.| U.S.A | U.S | U.S.| U S | U.S | u s | u.s | u.s.a |united states |United States", x=text_blob, replacement='USA')
+        
+        # remove contiguous spaces
+        text_blob <- gsub(pattern = "\\s+", x=text_blob, replacement=' ')
+        
+        # split sentences by split code
+        sentence_vector <- unlist(strsplit(x=text_blob, split='ootoo',fixed = TRUE))
+        return(sentence_vector)
+}
+
+```
+
+
+
+
+
+```{r}
+#  get clean sentance
+corpus_sentences = Clean_Sentences(sample_crop)
+```
+
+
+```{r}
+# n gram
+
+Trim <- function( x ) {
+       
+        gsub("(^[[:space:]]+|[[:space:]]+$)", "", x)
+}
+ 
+
+Get_Ngrams <- function(sentence_splits, ngram_size=2) {
+        ngrams <- c()
+        for (sentence in sentence_splits) {
+                sentence <- Trim(sentence)
+                if ((nchar(sentence) > 0) && (sapply(gregexpr("\\W+", sentence), length) >= ngram_size)) {
+                        ngs <- ngram(sentence , n=ngram_size)
+                        ngrams <- c(ngrams, get.ngrams(ngs))
+                }
+        }
+        return (ngrams)
+}
+```
+
+
+```{r}
+n2 <- Get_Ngrams(corpus_sentences, ngram_size=2)
+n3 <- Get_Ngrams(corpus_sentences, ngram_size=3)
+n4 <- Get_Ngrams(corpus_sentences, ngram_size=4)
+n5 <- Get_Ngrams(corpus_sentences, ngram_size=5)
+
+# consolidate all n-gram vectors into one
+n_all <- c(n2, n3, n4,n5)
+
+# save the n-grams in the same folder as your shiny code
+write.csv(n_all, './data/capstone_ngrams.csv', row.names=FALSE)
+ write.csv(n2, './data/n2_grams.csv', row.names=FALSE)
+ write.csv(n3, './data/n3_grams.csv', row.names=FALSE)
+ write.csv(n4, './data/n4_grams.csv', row.names=FALSE)
+write.csv(n5, './data/n5_grams.csv', row.names=FALSE)
+ 
+
+```
+
+
+
+
+
+
+
+
+
+
+ 

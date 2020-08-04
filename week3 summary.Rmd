@@ -525,3 +525,11 @@ next_word <- function(known_word){
 # next_word("patients")
 ```
 
+
+### Quiz 2
+
+```{r}
+know_word = "then you must be"
+next_word(know_word)
+```
+

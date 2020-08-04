@@ -1,0 +1,13 @@
+name: DS_capstone_project_Swiftkey
+title: DS_capstone_project_Swiftkey
+username:
+account: yinengchen1024
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 2640273
+bundleId: 3473746
+url: https://yinengchen1024.shinyapps.io/DS_capstone_project_Swiftkey/
+when: 1596551464.98549
+asMultiple: FALSE
+asStatic: FALSE
+ignoredFiles: pics/app.png|pics/words.png
